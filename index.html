@@ -282,7 +282,7 @@ const SPR={
 const TYPES=[
   {key:'jelly',pts:30,col:[1.0,.25,1.0]},
   {key:'eye',pts:20,col:[.2,1.0,1.0]},
-  {key:'brute',pts:10,col:[1.0,.5,.06]},
+  {key:'brute',pts:10,col:[.95,.8,.08]},
 ];
 function shieldBitmap(){
   const W=22,H=16,b=new Uint8Array(W*H);
@@ -546,14 +546,14 @@ const c3=$('c3');
 const renderer=new THREE.WebGLRenderer({canvas:c3,antialias:false,powerPreference:'high-performance'});
 const DPR=Math.min(devicePixelRatio||1,TOUCH?1.25:1.5);
 renderer.setPixelRatio(DPR);
-renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.0;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.9;
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x000000);
 scene.fog=new THREE.FogExp2(0x0a0016,0.0);
 const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,1400);
 const composer=new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth/2,innerHeight/2),.85,.5,.9);
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth/2,innerHeight/2),.5,.4,1.0);
 composer.addPass(bloom);
 const FX=new ShaderPass({
   uniforms:{tDiffuse:{value:null},uCA:{value:0},uGlitch:{value:0},uTime:{value:0},uVig:{value:.9},uTint:{value:new THREE.Vector3(1,1,1)}},
@@ -582,7 +582,8 @@ function resize3(){
   camera.fov=camera.aspect<1?72:55; camera.updateProjectionMatrix();
 }
 // lights
-const hemi=new THREE.HemisphereLight(0xff88ff,0x2a00ff,.45); scene.add(hemi);
+const hemi=new THREE.HemisphereLight(0xffb0ff,0x3020ff,.55);
+const shipLight=new THREE.PointLight(0xd8f0ff,0,14,1.4); scene.add(shipLight); scene.add(hemi);
 const sunL=new THREE.DirectionalLight(0xffffff,1.6); sunL.position.set(6,14,9); scene.add(sunL);
 const rimL=new THREE.DirectionalLight(0x33ccff,.9); rimL.position.set(-8,4,-12); scene.add(rimL);
 
@@ -591,7 +592,7 @@ const ENV={};
 { // synthwave grid
   const g=new THREE.PlaneGeometry(900,900,1,1); g.rotateX(-Math.PI/2);
   const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,
-    uniforms:{uScroll:{value:0},uOp:{value:0},uC1:{value:new THREE.Vector3(1.5,.12,1.3)},uC2:{value:new THREE.Vector3(.15,.8,1.8)}},
+    uniforms:{uScroll:{value:0},uOp:{value:0},uC1:{value:new THREE.Vector3(.75,.06,.65)},uC2:{value:new THREE.Vector3(.08,.4,.95)}},
     vertexShader:'varying vec3 vW;void main(){vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
     fragmentShader:`varying vec3 vW;uniform float uScroll,uOp;uniform vec3 uC1,uC2;
     void main(){vec2 p=vec2(vW.x,vW.z+uScroll)/2.5;vec2 g=abs(fract(p-.5)-.5)/fwidth(p);float l=1.-min(min(g.x,g.y),1.);
@@ -603,7 +604,7 @@ const ENV={};
   const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,fog:false,uniforms:{uT:{value:0},uOp:{value:0}},
     vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader:`varying vec2 vUv;uniform float uT,uOp;void main(){vec2 p=vUv-.5;float r=length(p);if(r>.5)discard;float y=vUv.y;
-    if(y<.58&&fract(y*15.-uT*.35)<(.58-y)*1.9)discard;vec3 c=mix(vec3(1.25,.05,.6),vec3(1.35,.95,.15),smoothstep(.1,.95,y));
+    if(y<.58&&fract(y*15.-uT*.35)<(.58-y)*1.9)discard;vec3 c=mix(vec3(.85,.03,.4),vec3(.95,.65,.1),smoothstep(.1,.95,y));
     float halo=smoothstep(.5,.44,r);gl_FragColor=vec4(c*uOp*halo,uOp*halo);}`});
   ENV.sun=new THREE.Mesh(new THREE.PlaneGeometry(210,210),m); ENV.sun.position.set(0,38,-620); ENV.sun.renderOrder=-8; scene.add(ENV.sun);
 }
@@ -639,13 +640,13 @@ const ENV={};
     float fbm(vec3 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n3(p);p*=2.03;a*=.5;}return s;}
     void main(){vec3 p=vD*3.+vec3(0.,0.,uT*.03);float a=fbm(p),b=fbm(p*1.7+a*2.);
       vec3 c=uC1*pow(a,3.)*2.4+uC2*pow(b,4.)*2.2;float st=step(.9985,hs(floor(vD*400.)));
-      gl_FragColor=vec4((c+st*1.5)*uOp,uOp);}`});
+      gl_FragColor=vec4((c*.6+st)*uOp,uOp);}`});
   ENV.neb=new THREE.Mesh(new THREE.SphereGeometry(1000,40,20),m); ENV.neb.renderOrder=-10; scene.add(ENV.neb);
 }
 { // hyperspace streaks
   const n=700, pos=new Float32Array(n*6), col=new Float32Array(n*6);
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('color',new THREE.BufferAttribute(col,3));
-  ENV.streakData=[]; for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, r=rand(10,90); ENV.streakData.push({x:Math.cos(a)*r,y:Math.sin(a)*r,z:rand(-500,20),c:pick([[.3,1.5,3],[3,.3,2.2],[2.5,2.5,2.5],[3,1.6,.3]])}); }
+  ENV.streakData=[]; for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, r=rand(10,90); ENV.streakData.push({x:Math.cos(a)*r,y:Math.sin(a)*r,z:rand(-500,20),c:pick([[.15,.6,1.1],[1,.12,.75],[.8,.8,.9],[1,.55,.1]])}); }
   ENV.streaks=new THREE.LineSegments(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
   ENV.streaks.frustumCulled=false; scene.add(ENV.streaks);
 }
@@ -665,15 +666,15 @@ function envUpdate(dt,t){
   env.scroll+=env.speed*dt;
   ENV.grid.material.uniforms.uScroll.value=env.scroll; ENV.grid.material.uniforms.uOp.value=env.grid; ENV.grid.visible=env.grid>.01;
   ENV.sun.material.uniforms.uT.value=t; ENV.sun.material.uniforms.uOp.value=env.sun; ENV.sun.visible=env.sun>.01;
-  ENV.mtnS.material.opacity=env.mtn; ENV.mtnW.material.opacity=env.mtn*.8; ENV.mtnS.visible=ENV.mtnW.visible=env.mtn>.01;
+  ENV.mtnS.material.opacity=env.mtn; ENV.mtnW.material.opacity=env.mtn*.45; ENV.mtnS.visible=ENV.mtnW.visible=env.mtn>.01;
   ENV.stars.material.opacity=env.stars; ENV.stars.visible=env.stars>.01; ENV.stars.rotation.y=t*.004;
   ENV.neb.material.uniforms.uT.value=t; ENV.neb.material.uniforms.uOp.value=env.neb; ENV.neb.visible=env.neb>.01;
   ENV.neb.position.copy(camera.position);
   // streaks
-  ENV.streaks.visible=env.streak>.01; ENV.streaks.material.opacity=env.streak;
+  ENV.streaks.visible=env.streak>.01; ENV.streaks.material.opacity=env.streak*.45;
   if(ENV.streaks.visible){
     const pos=ENV.streaks.geometry.attributes.position.array, col=ENV.streaks.geometry.attributes.color.array;
-    const sp=Math.max(env.speed,20)*2.2, len=Math.min(60,sp*.05);
+    const sp=Math.max(env.speed,20)*2.2, len=Math.min(30,sp*.03);
     ENV.streakData.forEach((s,i)=>{ s.z+=sp*dt; if(s.z>30){ s.z=-500; const a=Math.random()*Math.PI*2, r=rand(10,90); s.x=Math.cos(a)*r; s.y=Math.sin(a)*r; }
       const j=i*6; pos[j]=s.x; pos[j+1]=s.y; pos[j+2]=s.z; pos[j+3]=s.x; pos[j+4]=s.y; pos[j+5]=s.z-len;
       col[j]=s.c[0]; col[j+1]=s.c[1]; col[j+2]=s.c[2]; col[j+3]=0; col[j+4]=0; col[j+5]=0; });
@@ -688,7 +689,7 @@ function envUpdate(dt,t){
       const tw=env.twist*Math.sin(z*.012+t*.9)*9, tw2=env.twist*Math.cos(z*.009+t*.7)*6;
       _o.position.set(tw,tw2,z); _o.rotation.set(0,0,t*.25+z*.004*env.twist*3); _o.scale.setScalar(1); _o.updateMatrix();
       ENV.tun.setMatrixAt(i,_o.matrix);
-      _col.setHSL((env.hue+i*.023)%1,1,.55); _col.multiplyScalar(1.5*clamp((z+560)/200,0,1)); ENV.tun.setColorAt(i,_col);
+      _col.setHSL((env.hue+i*.023)%1,1,.55); _col.multiplyScalar(.6*clamp((z+560)/200,0,1)*clamp((10-z)/40,.15,1)); ENV.tun.setColorAt(i,_col);
     }
     ENV.tun.instanceMatrix.needsUpdate=true; ENV.tun.instanceColor.needsUpdate=true;
   }
@@ -740,21 +741,49 @@ function entMatrix(pos,rx,ry,rz,sc=1){ _e.set(rx,ry,rz); _q.setFromEuler(_e); _s
 // models
 const MOD={};
 for(const t of TYPES) MOD[t.key]=spriteModel(SPR[t.key+'A'],SPR[t.key+'B'],.25,1.6);
-for(const t of TYPES) MOD[t.key+'S']=spriteModel(SPR[t.key+'A'],SPR[t.key+'B'],.15,1.9);
+for(const t of TYPES) MOD[t.key+'S']=spriteModel(SPR[t.key+'A'],SPR[t.key+'B'],.18,1.9);
 MOD.cannon=spriteModel(SPR.cannon,null,.16,3);
 MOD.saucer=spriteModel(SPR.saucer,null,.22,3.2);
-MOD.ship=(()=>{ // original starfighter, built voxel by voxel
-  const L=[], add=(x,y,z,c)=>L.push([x,y,z,...c]);
-  const W=[.85,.82,.95], P=[1.3,.12,.9], C=[.12,1.1,1.5], O=[2.6,.9,.08], D=[.3,.3,.45];
-  for(let z=-7;z<=3;z++){ const hw=z<-4?0:z<-1?1:2; for(let x=-hw;x<=hw;x++){ add(x,0,z,Math.abs(x)===hw&&hw>0?D:W); if(z>-5&&Math.abs(x)<=hw-1) add(x,1,z,W); } }
-  for(let z=-4;z<=-1;z++) for(let x=-1;x<=1;x++) add(x,2,z,C);
-  add(0,1,-6,P); add(0,1,-5,P);
-  for(let x=3;x<=8;x++){ for(let z=Math.floor((x-3)*.6)-1;z<=2;z++){ add(x,0,z,x>6?P:W); add(-x,0,z,x>6?P:W); } }
-  for(let z=-3;z<=2;z++){ add(8,1,z,D); add(-8,1,z,D); }
-  add(8,1,-4,C); add(-8,1,-4,C);
-  for(const x of [-2,2]){ add(x,0,4,O); add(x,1,4,O); add(x,1,3,D); }
-  add(0,2,1,P); add(0,3,2,P); add(0,3,3,P); add(0,2,2,W); add(0,2,3,W);
-  return voxModel(L,.2);
+MOD.ship=(()=>{ // starfighter "NEON VIPER", built voxel by voxel
+  const L=[], seen=new Set(), add=(x,y,z,c)=>{ const k=x+','+y+','+z; if(seen.has(k)) return; seen.add(k); L.push([x,y,z,...c]); };
+  const mir=(x,y,z,c)=>{ add(x,y,z,c); add(-x,y,z,c); };
+  const W=[.78,.8,.9], G=[.42,.44,.55], K=[.1,.1,.16], P=[1.15,.1,.75], C=[.15,.95,1.4], O=[2.2,.75,.06], Y=[1.5,1.2,.15];
+  // fuselage: long tapered nose
+  for(let z=-10;z<=5;z++){
+    const hw=z<-8?0:z<-5?1:2;
+    for(let x=-hw;x<=hw;x++){ add(x,0,z,Math.abs(x)===hw&&hw>0?G:K);
+      if(z>-9) add(x,1,z,Math.abs(x)===hw&&hw>0?P:W); }
+    if(z>-6&&z<5) for(let x=-1;x<=1;x++) add(x,2,z,W);
+  }
+  add(0,1,-10,Y); add(0,0,-11,Y);
+  // canopy
+  for(let z=-5;z<=-1;z++) add(0,3,z,C); for(let z=-4;z<=-2;z++) mir(1,3,z,C);
+  // swept wings with neon leading edges
+  for(let x=3;x<=10;x++){ const z0=Math.floor((x-3)*.75)-2; for(let z=z0;z<=3;z++) mir(x,0,z,z===z0?P:(x>8?G:W)); }
+  for(let x=4;x<=9;x++) mir(x,1,Math.floor((x-3)*.75),G);
+  // wingtip cannons
+  for(let z=-5;z<=3;z++) mir(10,1,z,z<-3?C:G); mir(10,1,-6,Y);
+  // canards
+  mir(3,1,-6,P); mir(4,1,-5,P);
+  // twin tail fins
+  for(let y=2;y<=5;y++) for(let z=2+Math.floor((y-2)*.6);z<=5;z++) mir(2,y,z,y===5?P:G);
+  // engines
+  for(const x of [-1,1]){ add(x,1,6,O); add(x,0,6,O); add(x,2,5,G); }
+  mir(2,0,5,G); mir(2,1,5,G);
+  return voxModel(L.map(q=>[q[0],q[1]-1.5,q[2],q[3],q[4],q[5]]),.17);
+})();
+MOD.tank=(()=>{ // hover tank "BIT CRUSHER"
+  const L=[], seen=new Set(), add=(x,y,z,c)=>{ const k=x+','+y+','+z; if(seen.has(k)) return; seen.add(k); L.push(c?[x,y,z,...c]:[x,y,z]); };
+  const mir=(x,y,z,c)=>{ add(x,y,z,c); add(-x,y,z,c); };
+  const K=[.1,.1,.15], T=[.28,.28,.36], W=[.8,.82,.9], C=[.15,1.0,1.5], O=[2.2,.75,.06], P=[1.1,.1,.7], Y=[.4,1.9,2.6];
+  for(let z=-4;z<=4;z++){ mir(5,0,z,z%2?T:K); mir(4,0,z,K); mir(5,1,z,K); mir(4,1,z,z%2?K:T); }
+  for(let z=-3;z<=3;z++) for(let x=-3;x<=3;x++){ add(x,1,z); add(x,2,z,Math.abs(x)===3?P:null); }
+  for(let z=-2;z<=1;z++) for(let x=-2;x<=2;x++) add(x,3,z,W);
+  for(let x=-1;x<=1;x++){ add(x,4,-1,C); add(x,4,0,C); }
+  for(const bx of [-1,1]){ for(let z=-3;z>=-7;z--) add(bx,3,z,W); add(bx,3,-8,Y); }
+  for(let z=0;z<=3;z++) mir(6,2,z,P); mir(6,3,2,P); mir(6,3,3,P);
+  for(let x=-2;x<=2;x++) add(x,2,4,O); add(-1,1,4,O); add(1,1,4,O);
+  return voxModel(L.map(q=>[q[0],q[1]-2,q[2],...q.slice(3)]),.19);
 })();
 MOD.boss=null; // built in phase 4
 
@@ -793,7 +822,7 @@ const spkPos=new Float32Array(SPK_N*3), spkCol=new Float32Array(SPK_N*3);
 spkGeo.setAttribute('position',new THREE.BufferAttribute(spkPos,3)); spkGeo.setAttribute('color',new THREE.BufferAttribute(spkCol,3));
 const dotTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d'); const gr=g.createRadialGradient(32,32,0,32,32,32);
   gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.25,'rgba(255,255,255,.8)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
-const sparks=new THREE.Points(spkGeo,new THREE.PointsMaterial({size:.55,map:dotTex,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+const sparks=new THREE.Points(spkGeo,new THREE.PointsMaterial({size:.45,map:dotTex,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
 sparks.frustumCulled=false; scene.add(sparks);
 const SPK=[];
 function spark(x,y,z,vx,vy,vz,col,life=rand(.3,.8)){ if(SPK.length>=SPK_N) SPK.shift(); SPK.push({x,y,z,vx,vy,vz,col,life,ml:life}); }
@@ -802,7 +831,7 @@ function spkUpdate(dt){
   let n=0;
   for(let i=SPK.length-1;i>=0;i--){ const s=SPK[i]; s.life-=dt; if(s.life<=0){ SPK.splice(i,1); continue; }
     const k=Math.exp(-dt*2.5); s.vx*=k; s.vy*=k; s.vz*=k; s.x+=s.vx*dt; s.y+=s.vy*dt; s.z+=(s.vz+G_DEB.drift)*dt; }
-  for(const s of SPK){ const f=s.life/s.ml; spkPos[n*3]=s.x; spkPos[n*3+1]=s.y; spkPos[n*3+2]=s.z; spkCol[n*3]=s.col[0]*f; spkCol[n*3+1]=s.col[1]*f; spkCol[n*3+2]=s.col[2]*f; n++; }
+  for(const s of SPK){ const f=s.life/s.ml*.6; spkPos[n*3]=s.x; spkPos[n*3+1]=s.y; spkPos[n*3+2]=s.z; spkCol[n*3]=s.col[0]*f; spkCol[n*3+1]=s.col[1]*f; spkCol[n*3+2]=s.col[2]*f; n++; }
   spkGeo.setDrawRange(0,n); spkGeo.attributes.position.needsUpdate=true; spkGeo.attributes.color.needsUpdate=true;
 }
 
@@ -817,21 +846,21 @@ function ring(x,y,z,r,col,d=.6,flat=true){
 }
 function ringUpdate(dt){
   for(const R of RINGS){ if(!R.m.visible) continue; R.t+=dt; const k=R.t/R.d; if(k>=1){R.m.visible=false; continue;}
-    R.m.scale.setScalar(.2+easeOut(k)*R.r); R.m.material.opacity=1-k; }
+    R.m.scale.setScalar(.2+easeOut(k)*R.r); R.m.material.opacity=(1-k)*.55; }
 }
 
 // ---------- projectiles ----------
-const boltMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.13,.13,1.7),new THREE.MeshBasicMaterial({color:new THREE.Color(1.2,3.5,4.5),fog:false}),160);
+const boltMesh=new THREE.InstancedMesh(new THREE.BoxGeometry(.13,.13,1.7),new THREE.MeshBasicMaterial({color:new THREE.Color(.45,1.5,2.1),fog:false}),160);
 const orbMesh=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.34,1),new THREE.MeshBasicMaterial({color:0xffffff,fog:false}),500);
 for(const M of [boltMesh,orbMesh]){ M.instanceMatrix.setUsage(THREE.DynamicDrawUsage); M.frustumCulled=false; M.count=0; scene.add(M); }
 orbMesh.setColorAt(0,new THREE.Color(1,1,1));
 const BOLTS=[], ORBS=[];
 function fireBolt(x,y,z,vx,vy,vz,dmg=1){ if(BOLTS.length<160) BOLTS.push({x,y,z,vx,vy,vz,px:x,py:y,pz:z,life:2,dmg}); }
-function fireOrb(x,y,z,vx,vy,vz,col=[4,.6,2.6],size=1){ if(ORBS.length<500) ORBS.push({x,y,z,vx,vy,vz,life:7,col,size}); }
+function fireOrb(x,y,z,vx,vy,vz,col=[2.2,.14,.08],size=1){ if(ORBS.length<500) ORBS.push({x,y,z,vx,vy,vz,life:7,col,size}); }
 function projDraw(t){
   BOLTS.forEach((b,i)=>{ _v.set(b.x,b.y,b.z); _v2.set(b.vx,b.vy,b.vz).normalize(); _q.setFromUnitVectors(_s.set(0,0,-1),_v2); _s.set(1,1,1); _m.compose(_v,_q,_s); boltMesh.setMatrixAt(i,_m); });
   boltMesh.count=BOLTS.length; boltMesh.instanceMatrix.needsUpdate=true;
-  ORBS.forEach((o,i)=>{ const sc=o.size*(1+.18*Math.sin(t*30+i)); _v.set(o.x,o.y,o.z); _s.set(sc,sc,sc); _m.compose(_v,Q0,_s); orbMesh.setMatrixAt(i,_m); _c.setRGB(o.col[0],o.col[1],o.col[2]); orbMesh.setColorAt(i,_c); });
+  ORBS.forEach((o,i)=>{ const sc=o.size*1.2*(1+.12*Math.sin(t*20+i)); _v.set(o.x,o.y,o.z); _s.set(sc,sc,sc); _m.compose(_v,Q0,_s); orbMesh.setMatrixAt(i,_m); _c.setRGB(o.col[0],o.col[1],o.col[2]); orbMesh.setColorAt(i,_c); });
   orbMesh.count=ORBS.length; orbMesh.instanceMatrix.needsUpdate=true; if(orbMesh.instanceColor) orbMesh.instanceColor.needsUpdate=true;
 }
 
@@ -898,9 +927,9 @@ function p2Update(dt,t){
   pl.cd-=dt;
   const rapid=pl.power==='RAPID', maxB=rapid?14:pl.power==='TRIPLE'?9:4;
   if(inp.fire&&pl.cd<=0&&BOLTS.length<maxB&&P2.spawnT>1){
-    fireBolt(pl.x,.8,-1.1,0,0,-44);
+    pl.side=-(pl.side||1); fireBolt(pl.x+pl.side*.19,.72,-1.6,0,0,-44);
     if(pl.power==='TRIPLE'){ fireBolt(pl.x-.3,.8,-1.1,-7,0,-43); fireBolt(pl.x+.3,.8,-1.1,7,0,-43); }
-    pl.cd=rapid?.085:.19; SFX.laser(); burst(pl.x,1.1,-1.2,6,[.6,2.5,3],5,.25);
+    pl.cd=rapid?.085:.19; SFX.laser(); burst(pl.x+pl.side*.19,.72,-1.7,5,[.4,1.5,2],4,.2);
   }
   // ----- formation march -----
   const prog=1-P2.alive/P2.total;
@@ -932,7 +961,7 @@ function p2Update(dt,t){
       if(!src) src=pick(list);
       const p=invPos(src,t); const dx=pl.x-p.x, dz=0-p.z, L=Math.hypot(dx,dz), sp=9.5+prog*7;
       const aim=Math.random()<.6?1:0;
-      fireOrb(p.x,.8,p.z+.6,aim*dx/L*sp,0,aim?dz/L*sp:sp,[4,.5,2.4]);
+      fireOrb(p.x,.8,p.z+.6,aim*dx/L*sp,0,aim?dz/L*sp:sp,[2.2,.14,.08]);
       src.flash=.15; P2.fireT=lerp(1.05,.32,prog);
       tone({f:300,f2:120,d:.12,v:.05,type:'square',lp:1500});
     }
@@ -962,7 +991,7 @@ function p2Update(dt,t){
   for(let i=ORBS.length-1;i>=0;i--){ const o=ORBS[i];
     o.x+=o.vx*dt; o.y+=o.vy*dt; o.z+=o.vz*dt; o.life-=dt;
     if(o.z>9||o.life<=0){ ORBS.splice(i,1); continue; }
-    if(Math.random()<.3) spark(o.x,o.y,o.z,rand(-1,1),rand(-1,1),rand(0,2),[2,.3,1.2],.25);
+    if(Math.random()<.3) spark(o.x,o.y,o.z,rand(-1,1),rand(-1,1),rand(0,2),[1.6,.12,.05],.2);
     if(shieldHit3(o.x,o.z,'boom')){ burst(o.x,o.y,o.z,12,[3,.6,2],7,.4); ORBS.splice(i,1); continue; }
     if(pl.inv<=0&&Math.abs(o.x-pl.x)<.95&&Math.abs(o.z)<.8){ ORBS.splice(i,1); p2Hurt(false); continue; }
   }
@@ -989,7 +1018,7 @@ function p2Kill(iv,t){
 function p2Hurt(invaded){
   if(GOD&&!invaded) return;
   const pl=P2.pl;
-  explodeModel(MOD.cannon,cannonMatrix(pl.x,.65,0,0,0),0,[1,2.6,1.2],9,9);
+  explodeModel(MOD.tank,cannonMatrix(pl.x,.45,0,0,0),0,[.4,1.6,1.2],9,9);
   burst(pl.x,.8,0,50,[4,2,1],16,.9); ring(pl.x,.05,0,8,[3,1,.5],.8);
   SFX.hurt(); fx.shake=1; fx.ca=.04; flash(.45);
   P2.lives--; pl.inv=2.2; pl.power=null; ORBS.length=0;
@@ -1000,7 +1029,7 @@ function p2Draw(t){
   for(const iv of P2.inv){ if(!iv.alive||P2.spawnT<iv.appear) continue;
     const T=TYPES[iv.t]; pushModel(vbMain,MOD[T.key],invMatrix(iv,t),P2.frame,T.col.map(c=>c*(.8+iv.flash*4)),0); }
   const pl=P2.pl;
-  if(mode!=='dead'&&(pl.inv<=0||Math.floor(pl.inv*12)%2===0)) pushModel(vbMain,MOD.cannon,cannonMatrix(pl.x,.65,0,pl.rx,-pl.vx*.018),0,pl.power?[1.6,1.4,.3]:[.3,1.5,.5]);
+  if(mode!=='dead'&&(pl.inv<=0||Math.floor(pl.inv*12)%2===0)) pushModel(vbMain,MOD.tank,cannonMatrix(pl.x,.45+Math.sin(t*6)*.05,0,0,-pl.vx*.012),0,pl.power?[1.5,1.15,.15]:[.12,.75,.6]);
   if(P2.ufo) pushModel(vbMain,MOD.saucer,entMatrix(_v2.set(P2.ufo.x,1.3+Math.sin(t*4)*.15,P2.ufo.z),0,t*2,Math.sin(t*3)*.1),0,[3,.45,.45]);
   vbMain.end();
   if(shieldDirty) shieldRebuild();
@@ -1027,12 +1056,12 @@ function spUpdate(dt,canFire=true){
   SP.inv=Math.max(0,SP.inv-dt);
   SP.cd-=dt;
   if(canFire&&inp.fire&&SP.cd<=0){
-    SP.side=-SP.side; const wx=SP.x+SP.side*1.6*Math.cos(SP.roll), wy=SP.y+.25-SP.side*1.6*Math.sin(SP.roll)*.2;
+    SP.side=-SP.side; const wx=SP.x+SP.side*1.7*Math.cos(SP.roll), wy=SP.y-.1-SP.side*1.7*Math.sin(SP.roll);
     fireBolt(wx,wy,-1.2,0,0,-100); SP.cd=.085; SFX.pew();
-    spark(wx,wy,-1.4,0,0,-8,[.8,3,4],.12);
+    spark(wx,wy,-1.4,0,0,-8,[.4,1.4,2],.1);
   }
   // engine trail
-  for(const ex of [-.4,.4]) spark(SP.x+ex,SP.y+.15,1.0,rand(-1,1),rand(-1,1),rand(14,22),[1.8,.6,.1],rand(.1,.2));
+  for(const ex of [-.17,.17]) spark(SP.x+ex*Math.cos(SP.roll),SP.y-.2,1.15,rand(-1,1),rand(-1,1),rand(14,22),[2,.75,.15],rand(.08,.18));
   if(SP.od>=1&&(novaEdge||(ptr.taps>=2&&ptr.down))){ ptr.taps=0; nova(); }
 }
 let novaEdge=false, novaLatch=false, novaFn=null;
@@ -1044,7 +1073,7 @@ function spCamera(t){
 }
 function spHurt(){
   if(SP.inv>0||mode==='dead'||GOD) return;
-  explodeModel(MOD.ship,shipMatrix(),0,[3,1.5,2],10,2,.6);
+  explodeModel(MOD.ship,shipMatrix(),0,[1.5,.8,1],10,2,.6);
   burst(SP.x,SP.y,0,60,[4,2,1],18,.9); ring(SP.x,SP.y,0,8,[3,1,.6],.7,false);
   SFX.hurt(); fx.shake=1.1; fx.ca=.05; flash(.5);
   SP.lives--; SP.inv=2.2; ORBS.length=0;
@@ -1064,7 +1093,7 @@ function moveBolts(dt){
 function moveOrbs(dt){
   for(let i=ORBS.length-1;i>=0;i--){ const o=ORBS[i]; o.x+=o.vx*dt; o.y+=o.vy*dt; o.z+=o.vz*dt; o.life-=dt;
     if(o.z>14||o.life<=0){ ORBS.splice(i,1); continue; }
-    if(Math.random()<.25) spark(o.x,o.y,o.z,0,0,2,o.col.map(c=>c*.5),.2);
+    if(Math.random()<.15) spark(o.x,o.y,o.z,0,0,2,o.col.map(c=>c*.4),.15);
     const dx=o.x-SP.x, dy=o.y-SP.y, dz=o.z; const r=.75*o.size;
     if(SP.inv<=0&&Math.abs(dz)<1.2&&dx*dx+dy*dy<r*r+.25){ ORBS.splice(i,1); spHurt(); }
   }
@@ -1118,7 +1147,7 @@ function enemiesUpdate(dt,t,list,canFire=true){
     enemyPos(e,dt,t); e.frame=frame; e.flash=Math.max(0,e.flash-dt*4);
     if(e.z>14){ list.splice(i,1); continue; }
     if(canFire&&e.pat!=='dive'&&e.z<-14&&e.z>-80){ e.fireT-=dt*speedMul; if(e.fireT<=0){ e.fireT=rand(1.4,2.8)/Math.max(1,P3.t/P3_DUR*1.6);
-      const dx=SP.x-e.x,dy=SP.y-e.y,dz=-e.z,L=Math.hypot(dx,dy,dz),sp=24; fireOrb(e.x,e.y,e.z+.5,dx/L*sp,dy/L*sp,dz/L*sp,[4,.5,2.6]); } }
+      const dx=SP.x-e.x,dy=SP.y-e.y,dz=-e.z,L=Math.hypot(dx,dy,dz),sp=24; fireOrb(e.x,e.y,e.z+.5,dx/L*sp,dy/L*sp,dz/L*sp,[2.2,.14,.08],1.1); } }
     // vs player
     if(SP.inv<=0&&Math.abs(e.z)<1.3&&Math.hypot(e.x-SP.x,e.y-SP.y)<1.6){ list===P3.en?killEnemy(e,t,i,true):list.splice(i,1); spHurt(); continue; }
     // vs bolts
@@ -1157,7 +1186,7 @@ function p3Update(dt,t){
     P3.astT-=dt; if(P3.astT<=0){ astSpawn(); P3.astT=rand(.6,1.6)*lerp(1.3,.6,P3.t/P3_DUR); }
     P3.gateT-=dt; if(P3.gateT<=0){ const g=GATES.find(q=>!q.on); if(g){ g.on=true; g.m.visible=true; g.m.position.set(rand(-7,7),rand(-4,4),-280); } P3.gateT=rand(5,8); }
   }
-  if(!P3.twisted&&P3.t>P3_DUR*.5){ P3.twisted=true; banner('HALFWAY · HOLD ON','HYPER TUNNEL','#3cf'); envSet({twist:1,speed:110}); ENV.neb.material.uniforms.uC1.value.set(0,.6,1); ENV.neb.material.uniforms.uC2.value.set(1,.1,.8); SFX.morph(); fx.glitch=.6; }
+  if(!P3.twisted&&P3.t>P3_DUR*.5){ P3.twisted=true; banner('HALFWAY · HOLD ON','HYPER TUNNEL','#3cf'); envSet({twist:1,speed:110}); ENV.neb.material.uniforms.uC1.value.set(0,.3,.55); ENV.neb.material.uniforms.uC2.value.set(.5,.05,.4); SFX.morph(); fx.glitch=.6; }
   moveBolts(dt); moveOrbs(dt);
   enemiesUpdate(dt,t,P3.en);
   astUpdate(dt); gateUpdate(dt);
@@ -1251,12 +1280,12 @@ function bossAttack(dt,t){
   const name=ATKS[B.atkI%ATKS.length]; const rage=B.rage?1.5:1; const eye=eyeWorld();
   B.sub-=dt*rage*speedMul;
   if(name==='spiral'){ if(B.sub<=0){ B.sub=.075; B.spin+=.37;
-      for(const off of B.rage?[0,Math.PI*2/3,Math.PI*4/3]:[0,Math.PI]){ const a=B.spin+off; fireOrb(eye.x,eye.y,eye.z+1,Math.cos(a)*6.5,Math.sin(a)*4.2,24,[4,.35,2.2]); } } }
+      for(const off of B.rage?[0,Math.PI*2/3,Math.PI*4/3]:[0,Math.PI]){ const a=B.spin+off; fireOrb(eye.x,eye.y,eye.z+1,Math.cos(a)*6.5,Math.sin(a)*4.2,24,[2.1,.25,.1],1.05); } } }
   else if(name==='fan'){ if(B.sub<=0){ B.sub=.55; const dx=SP.x-eye.x,dy=SP.y-eye.y,dz=-eye.z,L=Math.hypot(dx,dy,dz);
       const n=B.rage?9:7; for(let i=0;i<n;i++){ const a=(i-(n-1)/2)*.07; const cx=Math.cos(a),sx=Math.sin(a);
-        const vx=(dx*cx+dz*sx)/L, vz=(-dx*sx+dz*cx)/L; fireOrb(eye.x,eye.y,eye.z+1,vx*32,dy/L*32,vz*32,[3.5,1.6,.3]); } tone({f:180,f2:60,d:.2,v:.12,type:'sawtooth',lp:900}); } }
+        const vx=(dx*cx+dz*sx)/L, vz=(-dx*sx+dz*cx)/L; fireOrb(eye.x,eye.y,eye.z+1,vx*32,dy/L*32,vz*32,[2,1,.08],1.05); } tone({f:180,f2:60,d:.2,v:.12,type:'sawtooth',lp:900}); } }
   else if(name==='rain'){ if(B.sub<=0){ B.sub=.05; const c=pick(B.cells); if(c.alive){ const w=bossWorld(c.gx,c.gy,c.gz);
-      const dx=SP.x+rand(-4,4)-w.x,dy=SP.y+rand(-3,3)-w.y,dz=-w.z,L=Math.hypot(dx,dy,dz); fireOrb(w.x,w.y,w.z+1,dx/L*28,dy/L*28,dz/L*28,[.4,2.2,4],.8); } } }
+      const dx=SP.x+rand(-4,4)-w.x,dy=SP.y+rand(-3,3)-w.y,dz=-w.z,L=Math.hypot(dx,dy,dz); fireOrb(w.x,w.y,w.z+1,dx/L*28,dy/L*28,dz/L*28,[1.7,.12,.8],.9); } } }
   else if(name==='swarm'){ if(B.sub<=0){ B.sub=.45; bossMinion(irand(0,2)); } }
   else if(name==='beam'){
     if(!B.beam){ B.beam={i:0,t:0,phase:'lock',tx:SP.x,ty:SP.y}; SFX.charge(); }
@@ -1272,8 +1301,8 @@ function bossAttack(dt,t){
     const me=beams[0], target=_v2.set(bm.tx+(bm.tx-eye.x)*(18/(-eye.z)),bm.ty+(bm.ty-eye.y)*(18/(-eye.z)),18);
     me.visible=true; me.position.copy(eye).lerp(target,.5); me.lookAt(target);
     const len=eye.distanceTo(target);
-    if(bm.phase==='lock'){ const w=.06+.04*Math.sin(t*60); me.scale.set(w,w,len); beamMats[0].opacity=.55+.4*Math.sin(t*40); beamMats[0].color.setRGB(4,.2,.3); }
-    else { const w=1.1+.25*Math.sin(t*70); me.scale.set(w,w,len); beamMats[0].opacity=1; beamMats[0].color.setRGB(5,1.4,2.2); }
+    if(bm.phase==='lock'){ const w=.06+.04*Math.sin(t*60); me.scale.set(w,w,len); beamMats[0].opacity=.5+.35*Math.sin(t*40); beamMats[0].color.setRGB(2.2,.12,.2); }
+    else { const w=1.1+.25*Math.sin(t*70); me.scale.set(w,w,len); beamMats[0].opacity=1; beamMats[0].color.setRGB(2.4,.5,.8); }
     return;
   }
   beams[0].visible=false;
@@ -1402,15 +1431,16 @@ function revealCamera(){
   if(k<.5){ camera.position.set(lerp(0,px*.3,k),lerp(h,8.2,k),lerp(-11,13.5,k)); camera.lookAt(lerp(0,px*.15,k),0,lerp(-11.001,-15,k)); }
 }
 function revealDraw(){
-  vbMain.begin(); pushModel(vbMain,MOD.cannon,cannonMatrix(P2.pl.x,lerp(.1,.65,-P2.pl.rx<1.5?1-(-P2.pl.rx)/(Math.PI/2):0),0,P2.pl.rx,0),0,[.3,1.5,.5]); vbMain.end();
+  { const k=Math.max(.04,1-(-P2.pl.rx)/(Math.PI/2)); const E=new THREE.Matrix4().compose(_v2.set(P2.pl.x,.45*k,0),Q0,_s.set(1,k,1));
+    vbMain.begin(); pushModel(vbMain,MOD.tank,E,0,[.12,.75,.6]); vbMain.end(); }
   if(shieldDirty) shieldRebuild();
 }
 // ---------- phase 2 → 3 : the morph ----------
 const MOR={};
 function startMorph(){
   mode='morph'; MOR.t=0; MOR.stage=0; ufoSound(false); slowmo(.3,1.1); flash(.7); fx.ca=.05;
-  const E=cannonMatrix(P2.pl.x,.65,0,0,0);
-  MOR.src=MOD.cannon.cells.map(c=>new THREE.Vector3(c.x,c.y,c.z).applyMatrix4(E));
+  const E=cannonMatrix(P2.pl.x,.45,0,0,0);
+  MOR.src=MOD.tank.cells.map(c=>new THREE.Vector3(c.x,c.y,c.z).applyMatrix4(E));
   MOR.from=new THREE.Vector3(P2.pl.x,.65,0); SP.x=P2.pl.x*.6; SP.y=0;
   banner('WAVE CLEARED','EARTH SAYS THANKS','#ff2bd6');
 }
@@ -1420,8 +1450,8 @@ function morphUpdate(dt){
     for(const s of P1.shields) for(let y=0;y<16;y++) for(let x=0;x<22;x++) if(s.b[y*22+x]){ s.b[y*22+x]=0; if(Math.random()<.6){ const wx=(s.x+x+.5-112)*S, wz=(s.y+y+.5-216)*S;
       debris(wx,rand(0,1.6),wz,rand(-4,4),rand(6,16),rand(-6,2),[.3,1.8,.5],S*.95,rand(1.5,3)); } }
     shieldDirty=true;
-    envSet({grid:0,mtn:0,sun:0,stars:.5,neb:1,streak:1,tun:.9,speed:70});
-    ENV.neb.material.uniforms.uC1.value.set(.5,0,.8); ENV.neb.material.uniforms.uC2.value.set(0,.45,.85);
+    envSet({grid:0,mtn:0,sun:0,stars:.5,neb:.8,streak:1,tun:.9,speed:70});
+    ENV.neb.material.uniforms.uC1.value.set(.3,0,.5); ENV.neb.material.uniforms.uC2.value.set(0,.25,.5);
     later(()=>{ G_DEB={g:0,floor:false,drift:30}; },600);
   }
   if(MOR.stage===1&&t>2.6){ MOR.stage=2; banner('PHASE 3 / 4',NAMES[3],GLOW[3]); setPhase(3); setTrack('hyper'); }
@@ -1431,7 +1461,7 @@ function morphUpdate(dt){
 function morphDraw(){
   const t=MOR.t, k=clamp((t-1.7)/1.6,0,1);
   vbMain.begin();
-  if(k<=0){ pushModel(vbMain,MOD.cannon,cannonMatrix(P2.pl.x,.65+Math.sin(t*20)*.03*t,0,0,0),0,[.3,1.5,.5]); }
+  if(k<=0){ pushModel(vbMain,MOD.tank,cannonMatrix(P2.pl.x,.45+Math.sin(t*20)*.03*t,0,0,0),0,[.12,.75,.6]); }
   else{
     const dst=MOD.ship, E=entMatrix(_v2.set(SP.x,lerp(.65,0,k),0),0,(1-ease(k))*Math.PI*2,0,1);
     for(let i=0;i<dst.cells.length;i++){ const c=dst.cells[i]; const s=MOR.src[i%MOR.src.length];
@@ -1440,7 +1470,7 @@ function morphDraw(){
       const x=lerp(s.x,_v.x,kk), y=lerp(s.y,_v.y,kk)+Math.sin(kk*Math.PI)*2.5, z=lerp(s.z,_v.z,kk);
       _q.setFromEuler(_e.set(kk*6+i,kk*4,0)).slerp(Q0,kk); const sz=dst.vs*.92;
       _m.compose(_v.set(x,y,z),_q,_s.set(sz,sz,sz)); const cc=c.cc||[1,1,1];
-      _c.setRGB(lerp(.3,cc[0],kk)+Math.sin(kk*Math.PI)*1.2,lerp(1.5,cc[1],kk)+Math.sin(kk*Math.PI)*.4,lerp(.5,cc[2],kk)+Math.sin(kk*Math.PI)*1.2); vbMain.push(_m,_c);
+      _c.setRGB(lerp(.12,cc[0],kk)+Math.sin(kk*Math.PI)*.6,lerp(.75,cc[1],kk)+Math.sin(kk*Math.PI)*.3,lerp(.6,cc[2],kk)+Math.sin(kk*Math.PI)*.6); vbMain.push(_m,_c);
       if(Math.random()<.04&&kk<.9) spark(x,y,z,0,0,0,[3,2,3.5],.3);
     }
   }
@@ -1458,7 +1488,7 @@ function novaBlast3(){ novaBlast(); for(let i=P3.en.length-1;i>=0;i--) if(P3.en[
 const WRN={};
 function startWarn(){ mode='warn'; WRN.t=0; WRN.stage=0; $('warn').style.display='flex'; SFX.warn();
   for(let i=P3.en.length-1;i>=0;i--) killEnemy(P3.en[i],T,i,true);
-  envSet({tun:0,twist:0,speed:25,streak:.4,neb:.6});
+  envSet({tun:0,twist:0,speed:25,streak:.4,neb:.5});
   ENV.neb.material.uniforms.uC1.value.set(.6,0,.14); ENV.neb.material.uniforms.uC2.value.set(.25,0,.5);
 }
 function warnUpdate(dt,t){
@@ -1507,10 +1537,10 @@ function jumpTo(n,retry){
   } else {
     P1.shields.forEach(s=>{ s.b.fill(0); s.dirty=true; }); shieldDirty=true; G_DEB={g:0,floor:false,drift:30}; scene.fog.density=.0;
     spReset(false); SP.od=retry?SP.od:0; $('od').style.display='block';
-    if(n===3){ envSet({grid:0,sun:0,mtn:0,stars:.5,neb:1,streak:1,tun:.9,twist:0,speed:70});
-      ENV.neb.material.uniforms.uC1.value.set(.5,0,.8); ENV.neb.material.uniforms.uC2.value.set(0,.45,.85);
+    if(n===3){ envSet({grid:0,sun:0,mtn:0,stars:.5,neb:.8,streak:1,tun:.9,twist:0,speed:70});
+      ENV.neb.material.uniforms.uC1.value.set(.3,0,.5); ENV.neb.material.uniforms.uC2.value.set(0,.25,.5);
       p3Setup(); setPhase(3); mode='p3'; novaFn=novaBlast3; setTrack('hyper'); banner('PHASE 3 / 4',NAMES[3],GLOW[3]); }
-    else { envSet({grid:0,sun:0,mtn:0,stars:.5,neb:.6,streak:.4,tun:0,twist:0,speed:25});
+    else { envSet({grid:0,sun:0,mtn:0,stars:.5,neb:.5,streak:.4,tun:0,twist:0,speed:25});
       ENV.neb.material.uniforms.uC1.value.set(.6,0,.14); ENV.neb.material.uniforms.uC2.value.set(.25,0,.5);
       p3Setup(); setPhase(4); bossSetup(); mode='p4'; novaFn=bossNova; TRACKS.boss.bpm=152; setTrack('boss'); banner('PHASE 4 / 4 · FINAL',NAMES[4],GLOW[4]); }
   }
@@ -1551,7 +1581,8 @@ function render3D(dt,rdt){
   fx.shake=Math.max(0,fx.shake-rdt*2.2);
   const sh=fx.shake*fx.shake*.6; camera.position.x+=rand(-1,1)*sh; camera.position.y+=rand(-1,1)*sh;
   fx.ca=Math.max(0,fx.ca-rdt*.12); fx.glitch=Math.max(0,fx.glitch-rdt*.9);
-  FX.uniforms.uCA.value=.004+fx.ca; FX.uniforms.uGlitch.value=fx.glitch; FX.uniforms.uTime.value=T;
+  FX.uniforms.uCA.value=.002+fx.ca*.7;
+  if(mode==='p2'||mode==='reveal'){ shipLight.position.set(P2.pl.x,3.5,2.5); shipLight.intensity=6; } else if(mode==='p3'||mode==='p4'||mode==='warn'||mode==='win'||mode==='morph'){ shipLight.position.set(SP.x,SP.y+2.5,3); shipLight.intensity=7; } else shipLight.intensity=0; FX.uniforms.uGlitch.value=fx.glitch; FX.uniforms.uTime.value=T;
   composer.render();
 }
 function frame(now){
@@ -1583,7 +1614,7 @@ function onResize(){ p1Layout(); resize3(); }
 addEventListener('resize',onResize); onResize();
 document.fonts&&document.fonts.load('8px "Press Start 2P"').then(()=>{}).catch(()=>{});
 requestAnimationFrame(frame);
-window.__game={get mode(){return mode},get phase(){return phase},jumpTo,startGame,startReveal,P1,P2,P3,B,SP,get score(){return score},
+window.__game={fireOrb,get mode(){return mode},get phase(){return phase},jumpTo,startGame,startReveal,P1,P2,P3,B,SP,get score(){return score},
   killAllP1(){ for(const iv of P1.inv) if(iv.alive){iv.alive=false;P1.alive--;} },
   killAllP2(){ for(const iv of P2.inv) if(iv.alive){ iv.alive=false; P2.alive--; } },
   set god(x){ GOD=x; }, endP3(){ P3.t=P3_DUR; }, bossHp(x){ B.hp=x; }, od(){ SP.od=1; } };
