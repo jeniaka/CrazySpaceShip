@@ -327,6 +327,7 @@ function p1NewGame(){
   P1.pl={x:16,alive:true,dead:0}; P1.shot=null; P1.shotBoom=null; P1.bombs=[]; P1.ufo=null; P1.ufoT=rand(18,24)*60; P1.ufoMsg=null;
   P1.shields=[0,1,2,3].map(i=>({x:32+i*45,y:192,b:shieldBitmap(),c:document.createElement('canvas'),dirty:true}));
   P1.lives=3; P1.tick=0; P1.bombT=60; P1.noteI=0; P1.noteT=.5; P1.booms=[]; P1.shots=0; P1.kills=0; P1.extra=false;
+  P1.t=0; P1.storm=false; P1.stormT=0; P1.snap=null;
   P1.state='play'; P1.paneled=false; P1.acc=0; P1.overT=0; P1.glitch=0;
 }
 function shieldAt(px,py){
@@ -347,18 +348,22 @@ function addScore(n){
   if(score>HI){HI=score; try{localStorage.setItem('inv78hi',HI)}catch(e){}}
 }
 function p1KillPlayer(){
-  if(GOD&&P1.lives>0) return;
-  const pl=P1.pl; pl.alive=false; pl.dead=110; P1.lives--; P1.bombs.length=0; SFX.pDie1();
+  if(GOD&&P1.lives>0&&!P1.storm) return;
+  const pl=P1.pl; if(!pl.alive) return; pl.alive=false; pl.dead=P1.storm?70:110; P1.lives--; if(P1.storm) P1.lives=0; else P1.bombs.length=0; SFX.pDie1();
 }
 function p1Tick(){
   P1.tick++;
   const pl=P1.pl;
   if(P1.state==='over'){ P1.overT++; return; }
+  if(P1.state==='stormdead'){ P1.overT++; P1.booms=P1.booms.filter(b=>--b.t>0); if(P1.overT>80){ P1.state='clear'; } return; }
   if(P1.state!=='play') return;
+  P1.t+=1/60;
+  if(!P1.storm&&P1.t>=P1_LIMIT) p1StartStorm();
+  if(P1.storm&&P1.tick%26===0) tone({f:500,f2:1100,d:.24,v:.06,type:'sawtooth',lp:2400,sweep:.24});
   // --- player ---
   if(!pl.alive){
     pl.dead--;
-    if(pl.dead<=0){ if(P1.lives>0){ pl.alive=true; pl.x=16; } else { P1.state='over'; P1.overT=0; ufoSound(false); return; } }
+    if(pl.dead<=0){ if(P1.lives>0){ pl.alive=true; pl.x=16; } else { P1.state='stormdead'; P1.overT=0; ufoSound(false); return; } }
   }else{
     pl.x=clamp(pl.x+inp.x*1.15,8,203);
     if(inp.fire&&!P1.shot&&!P1.shotBoom){ P1.shot={x:pl.x+6,y:207}; P1.shots++; SFX.shot1(); }
@@ -381,10 +386,10 @@ function p1Tick(){
   }
   if(P1.shotBoom&&--P1.shotBoom.t<=0) P1.shotBoom=null;
   if(P1.alive<=0){ P1.state='clear'; ufoSound(false); return; }
-  if(!pl.alive){ P1.booms=P1.booms.filter(b=>--b.t>0); return; }
-  // --- invaders: the ripple (one invader per tick) ---
-  if(P1.freeze>0) P1.freeze--;
-  else{
+  if(!pl.alive&&!P1.storm){ P1.booms=P1.booms.filter(b=>--b.t>0); return; }
+  // --- invaders: the ripple (one invader per tick, three during the storm) ---
+  if(P1.freeze>0&&!P1.storm) P1.freeze--;
+  else for(let rr=0;rr<(P1.storm?3:1);rr++){
     const n=P1.order.length; let guard=0;
     while(!P1.order[P1.ri].alive&&guard++<n){ P1.ri++; if(P1.ri>=n){P1.ri=0; p1SweepDone();} }
     const iv=P1.order[P1.ri];
@@ -404,7 +409,15 @@ function p1Tick(){
   P1.noteT-=1/60;
   if(P1.noteT<=0){ SFX.march(P1.noteI++); P1.noteT=clamp(P1.alive/62,.1,.85); }
   // --- bombs ---
-  if(--P1.bombT<=0&&P1.bombs.length<3){
+  if(P1.storm&&P1.bombs.length<140){ // the bullet storm: no escape
+    const cols={}; for(const iv of P1.inv) if(iv.alive&&(!cols[iv.c]||iv.y>cols[iv.c].y)) cols[iv.c]=iv;
+    const list=Object.values(cols); if(list.length){ const s=pick(list); P1.bombs.push({x:s.x+Math.floor(s.w/2),y:s.y+8,ty:irand(0,2),f:0}); }
+    const sp=P1.stormT<1?40:Math.max(8,40-P1.stormT*14);
+    P1.bombs.push({x:Math.round(clamp(pl.x+6+rand(-sp,sp),4,220)),y:rand(34,60),ty:irand(0,2),f:0});
+    if(P1.stormT>1.2) P1.bombs.push({x:Math.round(pl.x+6+rand(-6,6)),y:150,ty:irand(0,2),f:0});
+    P1.stormT+=1/60;
+  }
+  else if(--P1.bombT<=0&&P1.bombs.length<3){
     const cols={}; for(const iv of P1.inv) if(iv.alive&&(!cols[iv.c]||iv.y>cols[iv.c].y)) cols[iv.c]=iv;
     const list=Object.values(cols);
     let src=null;
@@ -413,7 +426,7 @@ function p1Tick(){
     if(src) P1.bombs.push({x:src.x+Math.floor(src.w/2),y:src.y+8,ty:irand(0,2),f:0});
     P1.bombT=P1.alive>20?irand(28,55):irand(16,34);
   }
-  const bs=P1.alive<=8?2.1:1.4;
+  const bs=P1.storm?2.8:P1.alive<=8?2.1:1.4;
   for(let i=P1.bombs.length-1;i>=0;i--){
     const b=P1.bombs[i]; b.y+=bs; if(P1.tick%4===0) b.f=(b.f+1)%4;
     let gone=false;
@@ -430,6 +443,8 @@ function p1Tick(){
   P1.booms=P1.booms.filter(b=>--b.t>0);
   if(!P1.extra&&score>=1500){ P1.extra=true; P1.lives++; SFX.power(); }
 }
+const P1_LIMIT=20;
+function p1StartStorm(){ P1.storm=true; P1.stormT=0; P1.snap=P1.shields.map(s=>s.b.slice()); P1.freeze=0; SFX.glitch(); }
 function p1SweepDone(){
   if(P1.dropping){ P1.dropping=false; P1.dir=-P1.dir; return; }
   let mn=999,mx=-999; for(const iv of P1.inv) if(iv.alive){ mn=Math.min(mn,iv.x); mx=Math.max(mx,iv.x+iv.w); }
@@ -449,6 +464,7 @@ function p1Draw(){
   if(P1.state==='title'){ p1DrawTitle(); return p1Blit(); }
   txt('SCORE',16,8); txt('HI-SCORE',120,8);
   txt(pad(score,5),16,20); txt(pad(HI,5),136,20);
+  if(P1.state==='play'&&!P1.storm){ const k=clamp(1-P1.t/P1_LIMIT,0,1); v.fillStyle=k<.3&&(P1.tick>>3)%2?'#ff3a3a':'#fff'; v.fillRect(72,30,Math.round(80*k),2); }
   for(const iv of P1.inv) if(iv.alive) v.drawImage(SC[TYPES[iv.t].key+(iv.f?'B':'A')],iv.x,iv.y);
   for(const s of P1.shields){
     if(s.dirty){ s.c.width=22; s.c.height=16; const g=s.c.getContext('2d'), id=g.createImageData(22,16);
@@ -469,14 +485,17 @@ function p1Draw(){
   txt(String(Math.max(0,P1.lives)),8,243);
   for(let i=0;i<Math.min(P1.lives-1,5);i++) v.drawImage(SC.cannon,24+i*16,243);
   txt('CREDIT 01',140,243);
-  if(P1.state==='over'){ v.fillStyle='#000'; v.fillRect(56,52,112,20); if((P1.overT>>4)%2===0||P1.overT>90) txt('GAME OVER',60,58,'#fff'); }
+  if(P1.storm&&P1.state==='play'){ if((P1.tick>>3)%2===0) txt('NO ESCAPE',76,140,'#ff3a3a'); }
+  if(P1.state==='clear'&&P1.storm){ v.fillStyle='#000'; v.fillRect(40,52,144,20); txt('JUST KIDDING.',60,58,'#fff'); }
+  if(P1.state==='over'||P1.state==='stormdead'){ v.fillStyle='#000'; v.fillRect(56,52,112,20); if((P1.overT>>4)%2===0||P1.overT>90) txt('GAME OVER',60,58,'#fff'); }
   // the cellophane overlay
   v.globalCompositeOperation='multiply';
   v.fillStyle='#ff3a3a'; v.fillRect(0,32,VW,24);
   v.fillStyle='#38ff52'; v.fillRect(0,184,VW,56); v.fillRect(0,240,130,16);
   v.globalCompositeOperation='source-over';
   // foreshadowing glitches
-  const g=Math.max(P1.glitch,P1.kills>34?(P1.kills-34)/40:0);
+  if(P1.storm&&P1.state!=='clear'){ v.globalCompositeOperation='lighter'; v.globalAlpha=.25+.2*Math.sin(P1.tick*.5); v.fillStyle='#ff1030'; v.fillRect(0,56,VW,128); v.globalAlpha=1; v.globalCompositeOperation='source-over'; }
+  const g=Math.max(P1.glitch,P1.storm?.5:P1.t>13?(P1.t-13)/14:0);
   if(g>0&&Math.random()<g*.5){
     const y=irand(30,230), h=irand(2,6+g*10), dx=irand(-8,8)*(1+g*3);
     v.drawImage(vc,0,y,VW,h,dx,y,VW,h);
@@ -1354,6 +1373,7 @@ function camTopDown(){ const vf=THREE.MathUtils.degToRad(camera.fov/2), tv=Math.
   return Math.max(16/tv,14.5/(tv*camera.aspect))/.97; }
 function startReveal(){
   mode='reveal'; REV.t=0; REV.stage=0; ufoSound(false);
+  if(P1.snap) P1.shields.forEach((s,i)=>{ s.b=P1.snap[i].slice(); s.dirty=true; });
   shieldSnap=P1.shields.map(s=>s.b.slice());
   P2.pl={x:(P1.pl.x+6.5-112)*S,vx:0,inv:0,cd:0,power:null,pt:0,rx:-Math.PI/2};
 }
