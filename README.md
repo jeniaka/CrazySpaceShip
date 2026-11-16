@@ -53,6 +53,6 @@ Run it locally by opening `index.html` in a browser, or with `python3 -m http.se
 |---|---|
 | 🦖 [**404: Dino Not Found**](https://github.com/jeniaka/dino-404) | the offline dino runner that falls into 3D · [play](https://dino-404.pages.dev) |
 | 👾 **INVASION '78** | you are here |
-| 🤖 [**MUNCHBOT '80**](https://github.com/jeniaka/pacman) | a 1980 maze chase that becomes a crime city, a shooter and a donut in space · [play](https://pacman-gta.pages.dev) |
+| 🤖 [**MUNCHBOT '80**](https://github.com/jeniaka/pacman) | a 1980 maze chase that becomes a crime city, a first-person shooter and a jungle platformer · [play](https://crazy-pacman.pages.dev) |
 
 <div align="center"><sub>Built by <a href="https://github.com/jeniaka">jeniaka</a> with Claude</sub></div>
